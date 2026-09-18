@@ -1,0 +1,8 @@
+{
+  "appId": "com.bank.loan.calculator",
+  "appName": "房贷还款计算器",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
