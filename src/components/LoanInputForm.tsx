@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { LoanInput, RepaymentMethod } from '../types';
 import { formatChineseRMB } from '../utils/calculator';
-import { Landmark, Percent, Calendar, HelpCircle, Layers, ArrowDownUp } from 'lucide-react';
+import { Landmark, Percent, Calendar, ArrowDownUp, Plus, Minus, Sliders } from 'lucide-react';
 
 interface LoanInputFormProps {
   input: LoanInput;
   onChange: (input: LoanInput) => void;
 }
 
-const AMOUNT_PRESETS = [50, 80, 100, 150, 200, 300];
+const AMOUNT_PRESETS = [30, 50, 80, 100, 150, 200, 300];
+
 const RATE_PRESETS = [
   { label: '公积金首套 (2.60%)', value: 2.6 },
   { label: '商贷优惠 (2.80%)', value: 2.8 },
@@ -16,23 +17,56 @@ const RATE_PRESETS = [
   { label: '公积金二套 (3.15%)', value: 3.15 },
   { label: '常规商贷 (3.30%)', value: 3.3 },
 ];
-const TERM_PRESETS = [10, 15, 20, 25, 30];
+
+// 涵盖短期、中期和长期的完整年限预设 (1年 ~ 30年)
+const POPULAR_TERMS = [
+  { years: 1, label: '1年 (12期)' },
+  { years: 2, label: '2年 (24期)' },
+  { years: 3, label: '3年 (36期)' },
+  { years: 5, label: '5年 (60期)' },
+  { years: 10, label: '10年 (120期)' },
+  { years: 15, label: '15年 (180期)' },
+  { years: 20, label: '20年 (240期)' },
+  { years: 25, label: '25年 (300期)' },
+  { years: 30, label: '30年 (360期)' },
+];
 
 export const LoanInputForm: React.FC<LoanInputFormProps> = ({ input, onChange }) => {
+  // 保持年限输入的本地临时输入字符串，避免删除时光标跳跃或强制回退
+  const [termYearsText, setTermYearsText] = useState<string>(input.termYears.toString());
+  const [amountText, setAmountText] = useState<string>(input.loanAmountWan.toString());
+  const [rateText, setRateText] = useState<string>(input.annualRate.toString());
+
+  useEffect(() => {
+    setTermYearsText(input.termYears.toString());
+  }, [input.termYears]);
+
+  useEffect(() => {
+    setAmountText(input.loanAmountWan.toString());
+  }, [input.loanAmountWan]);
+
+  useEffect(() => {
+    setRateText(input.annualRate.toString());
+  }, [input.annualRate]);
+
+  // 金额输入
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    onChange({
-      ...input,
-      loanAmountWan: isNaN(val) ? 0 : Math.max(0, Math.min(10000, val)),
-    });
+    const raw = e.target.value;
+    setAmountText(raw);
+    const val = parseFloat(raw);
+    if (!isNaN(val) && val >= 0) {
+      onChange({ ...input, loanAmountWan: Math.min(10000, val) });
+    }
   };
 
+  // 利率输入
   const handleRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    onChange({
-      ...input,
-      annualRate: isNaN(val) ? 0 : Math.max(0, Math.min(30, val)),
-    });
+    const raw = e.target.value;
+    setRateText(raw);
+    const val = parseFloat(raw);
+    if (!isNaN(val) && val >= 0) {
+      onChange({ ...input, annualRate: Math.min(30, val) });
+    }
   };
 
   const adjustRate = (delta: number) => {
@@ -40,8 +74,30 @@ export const LoanInputForm: React.FC<LoanInputFormProps> = ({ input, onChange })
     onChange({ ...input, annualRate: newRate });
   };
 
-  const handleTermChange = (years: number) => {
-    onChange({ ...input, termYears: years });
+  // 年限输入与调整 (支持 1 到 40 年自由设置)
+  const handleTermYearsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setTermYearsText(raw);
+    const val = parseInt(raw, 10);
+    if (!isNaN(val) && val >= 1) {
+      onChange({ ...input, termYears: Math.min(40, val) });
+    }
+  };
+
+  const handleTermYearsBlur = () => {
+    const val = parseInt(termYearsText, 10);
+    if (isNaN(val) || val < 1) {
+      setTermYearsText('1');
+      onChange({ ...input, termYears: 1 });
+    } else if (val > 40) {
+      setTermYearsText('40');
+      onChange({ ...input, termYears: 40 });
+    }
+  };
+
+  const adjustTermYears = (deltaYears: number) => {
+    const next = Math.max(1, Math.min(40, input.termYears + deltaYears));
+    onChange({ ...input, termYears: next });
   };
 
   const handleMethodChange = (method: RepaymentMethod) => {
@@ -56,7 +112,7 @@ export const LoanInputForm: React.FC<LoanInputFormProps> = ({ input, onChange })
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span>
             贷款条件输入
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">支持商业贷款、公积金贷款及组合计算分析</p>
+          <p className="text-xs text-slate-500 mt-0.5">支持1~40年期商业贷款、公积金贷款及短期消费贷款</p>
         </div>
         <div className="text-xs font-medium px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-200/60">
           默认等额本金
@@ -71,7 +127,7 @@ export const LoanInputForm: React.FC<LoanInputFormProps> = ({ input, onChange })
             还款方式
           </span>
           <span className="text-xs font-normal text-slate-500">
-            {input.repaymentMethod === 'equal_principal' ? '前期还款多，每月递减，利息少' : '每月还款额固定，前期压力较小'}
+            {input.repaymentMethod === 'equal_principal' ? '前期还款多，每月递减，利息最省' : '每月还款额固定，前期压力较小'}
           </span>
         </label>
         <div className="grid grid-cols-2 gap-3">
@@ -133,8 +189,8 @@ export const LoanInputForm: React.FC<LoanInputFormProps> = ({ input, onChange })
             type="number"
             min="1"
             max="10000"
-            step="5"
-            value={input.loanAmountWan || ''}
+            step="1"
+            value={amountText}
             onChange={handleAmountChange}
             placeholder="例如: 100"
             className="w-full pl-4 pr-16 py-2.5 text-lg font-bold text-slate-900 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white"
@@ -174,7 +230,7 @@ export const LoanInputForm: React.FC<LoanInputFormProps> = ({ input, onChange })
             <Percent className="w-4 h-4 text-emerald-600" />
             贷款年利率
           </label>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-slate-500 font-mono">
             月利率约 {(input.annualRate / 12).toFixed(4)}%
           </span>
         </div>
@@ -187,10 +243,10 @@ export const LoanInputForm: React.FC<LoanInputFormProps> = ({ input, onChange })
               min="0.1"
               max="25"
               step="0.05"
-              value={input.annualRate || ''}
+              value={rateText}
               onChange={handleRateChange}
               placeholder="例如: 2.8"
-              className="w-full pl-4 pr-12 py-2.5 text-lg font-bold text-slate-900 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white"
+              className="w-full pl-4 pr-12 py-2.5 text-lg font-bold text-slate-900 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white font-mono"
             />
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500 pointer-events-none">
               %
@@ -253,63 +309,138 @@ export const LoanInputForm: React.FC<LoanInputFormProps> = ({ input, onChange })
         </div>
       </div>
 
-      {/* 还款年限 */}
-      <div className="space-y-2">
+      {/* 还款年限（支持 1 到 40 年自由设置，修复了原先预设只从10年起步的问题） */}
+      <div className="space-y-3 pt-1 border-t border-slate-100">
         <div className="flex items-center justify-between">
           <label htmlFor="input-loan-term" className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
             <Calendar className="w-4 h-4 text-emerald-600" />
-            还款年限
+            还款年限设置
           </label>
-          <span className="text-xs text-slate-500 font-mono">
-            共计 {input.termYears * 12} 期（月）
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+              当前: {input.termYears} 年 ({input.termYears * 12} 期)
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-2">
-          {TERM_PRESETS.map((years) => (
+        {/* 核心主输入与微调步进器 */}
+        <div className="flex items-center gap-2">
+          {/* 减年限步进按钮 */}
+          <div className="flex items-center gap-1">
             <button
-              key={years}
               type="button"
-              onClick={() => handleTermChange(years)}
-              className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
-                input.termYears === years
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-              }`}
+              onClick={() => adjustTermYears(-5)}
+              disabled={input.termYears <= 1}
+              title="减少 5 年"
+              className="h-11 px-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
-              {years} 年
+              -5年
             </button>
-          ))}
-        </div>
+            <button
+              type="button"
+              onClick={() => adjustTermYears(-1)}
+              disabled={input.termYears <= 1}
+              title="减少 1 年"
+              className="h-11 px-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              -1年
+            </button>
+          </div>
 
-        <div className="flex items-center gap-3 pt-1">
+          {/* 年限数字输入框 */}
           <div className="relative flex-1">
             <input
-              id="input-loan-term-custom"
+              id="input-loan-term"
               type="number"
               min="1"
               max="40"
-              value={input.termYears || ''}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                onChange({ ...input, termYears: isNaN(val) ? 1 : Math.max(1, Math.min(40, val)) });
-              }}
-              className="w-full pl-3 pr-12 py-2 text-sm font-semibold text-slate-900 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
-              placeholder="自定义年限"
+              step="1"
+              value={termYearsText}
+              onChange={handleTermYearsChange}
+              onBlur={handleTermYearsBlur}
+              placeholder="输入1~40年"
+              className="w-full pl-4 pr-12 py-2.5 text-lg font-bold text-slate-900 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 bg-white font-mono"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">年</span>
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500 pointer-events-none">
+              年
+            </span>
           </div>
 
-          <div className="flex-1">
-            <input
-              id="input-loan-start-date"
-              type="month"
-              value={input.startYearMonth}
-              onChange={(e) => onChange({ ...input, startYearMonth: e.target.value })}
-              className="w-full px-3 py-2 text-sm font-semibold text-slate-900 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
-              title="首期还款年月"
-            />
+          {/* 增年限步进按钮 */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => adjustTermYears(1)}
+              disabled={input.termYears >= 40}
+              title="增加 1 年"
+              className="h-11 px-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              +1年
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustTermYears(5)}
+              disabled={input.termYears >= 40}
+              title="增加 5 年"
+              className="h-11 px-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              +5年
+            </button>
           </div>
+        </div>
+
+        {/* 滑动条辅助调节 (1年 - 30年) */}
+        <div className="pt-1">
+          <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+            <span>1年 (短期)</span>
+            <span>5年</span>
+            <span>10年</span>
+            <span>20年</span>
+            <span>30年 (长期)</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="30"
+            step="1"
+            value={Math.min(30, input.termYears)}
+            onChange={(e) => onChange({ ...input, termYears: parseInt(e.target.value, 10) })}
+            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+          />
+        </div>
+
+        {/* 覆盖从 1年 到 30年的全部快捷预设按钮组 */}
+        <div className="space-y-1.5 pt-1">
+          <div className="text-xs text-slate-500 font-medium">快捷选择常用年限：</div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+            {POPULAR_TERMS.map((item) => (
+              <button
+                key={item.years}
+                type="button"
+                onClick={() => onChange({ ...input, termYears: item.years })}
+                className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all truncate text-center ${
+                  input.termYears === item.years
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-1 ring-emerald-600'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 首期年月设置 */}
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <span className="text-xs text-slate-600">首期还款年月：</span>
+          <input
+            id="input-loan-start-date"
+            type="month"
+            value={input.startYearMonth}
+            onChange={(e) => onChange({ ...input, startYearMonth: e.target.value })}
+            className="px-3 py-1.5 text-xs font-semibold text-slate-900 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+            title="首期还款年月"
+          />
         </div>
       </div>
     </div>

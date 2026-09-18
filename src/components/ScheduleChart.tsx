@@ -25,8 +25,9 @@ export const ScheduleChart: React.FC<ScheduleChartProps> = ({ result }) => {
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
-  // 坐标转换计算
-  const getX = (index: number) => padding.left + (index / (totalMonths - 1)) * chartW;
+  // 坐标转换计算 (确保年限较短如1年时不会除以0)
+  const divisor = totalMonths > 1 ? totalMonths - 1 : 1;
+  const getX = (index: number) => padding.left + (index / divisor) * chartW;
 
   // 月供趋势坐标
   const getYPayment = (val: number) => {
@@ -158,7 +159,7 @@ export const ScheduleChart: React.FC<ScheduleChartProps> = ({ result }) => {
 
           {/* X 轴刻度标签 */}
           {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-            const idx = Math.round(ratio * (totalMonths - 1));
+            const idx = Math.max(0, Math.min(totalMonths - 1, Math.round(ratio * (totalMonths - 1))));
             const x = getX(idx);
             const item = schedule[idx];
             return (
