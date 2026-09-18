@@ -1,0 +1,6 @@
+{
+  "name": "房贷还款计算器",
+  "description": "专业贷款与房贷月供利息计算工具，默认支持等额本金还款计算，提供月供、月利息、总利息分析并支持导出完整还款明细表格。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
